@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Report Didattico Charpy - V3 con Zoom</title>
+    <style>
+        :root { --primary: #000; --accent: #d32f2f; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; padding: 20px; color: #333; }
+        .paper { max-width: 950px; margin: auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+        
+        header { border-bottom: 3px solid var(--primary); text-align: center; margin-bottom: 30px; }
+        .grid-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; background: #f9f9f9; padding: 20px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 20px; }
+        
+        .camera-panel { background: #fff3e0; padding: 15px; border: 1px solid #ffe0b2; border-radius: 8px; margin-bottom: 30px; display: flex; gap: 20px; align-items: center; justify-content: center; }
+        .camera-panel label { font-size: 0.7rem; font-weight: bold; }
+
+        .field { display: flex; flex-direction: column; }
+        label { font-size: 0.75rem; font-weight: bold; margin-bottom: 5px; color: #555; }
+        input, textarea { padding: 10px; border: 1px solid #bbb; border-radius: 4px; font-size: 1rem; }
+        
+        .phase-block { margin-bottom: 50px; padding-top: 20px; border-top: 1px solid #eee; }
+        .phase-title { font-weight: 900; font-size: 1.1rem; color: var(--primary); margin-bottom: 10px; }
+        
+        canvas { background: #fff; border: 1px solid #f0f0f0; display: block; margin: 10px 0; max-width: 100%; }
+        textarea { width: 100%; height: 90px; margin-top: 10px; background: #fffde7; border: 1px solid #e0d8a0; resize: none; font-family: inherit; }
+        
+        .results-summary { background: var(--primary); color: #fff; padding: 20px; border-radius: 5px; font-family: monospace; font-size: 1.1rem; margin-top: 20px; }
+        .red { color: #ff5252; font-weight: bold; }
+
+        .btn-box { margin-top: 30px; display: flex; gap: 15px; justify-content: center; }
+        button { padding: 15px 30px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; text-transform: uppercase; transition: 0.2s; }
+        .btn-send { background: var(--accent); color: white; }
+        .btn-print { background: var(--primary); color: white; }
+        button:hover { opacity: 0.8; }
+
+        @media print {
+            .btn-box, .grid-inputs, .camera-panel, label { display: none !important; }
+            body { background: white; padding: 0; }
+            .paper { box-shadow: none; width: 100%; padding: 0; }
+            textarea { border: none; background: transparent; padding: 0; height: auto; }
+            canvas { border: none; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="paper">
+    <header>
+        <h1>SCRIVERE IL REPORT DI LABORATORIO: PENDOLO DI CHARPY</h1>
+         <h2>Prof. Giuseppe Salerno - Istituto Palmieri Rampone Polo</h2>
+          <h3>Descrivere le osservazioni e le varie fasi della prova di Charpy</h3> 
+        <p>Laboratorio di Meccanica e Scienza dei Materiali</p>
+    </header>
+
+    <!-- DATI IDENTIFICATIVI E FISICI -->
+    <div class="grid-inputs">
+        <div class="field">
+            <label>Nome</label>
+            <input type="text" id="nome" placeholder="Nome">
+        </div>
+        <div class="field">
+            <label>Cognome</label>
+            <input type="text" id="cognome" placeholder="Cognome">
+        </div>
+        <div class="field">
+            <label>Massa Mazza (kg)</label>
+            <input type="number" id="mass" value="20.00" oninput="updateReport()">
+        </div>
+        <div class="field">
+            <label>Lunghezza (m)</label>
+            <input type="number" id="length" value="0.800" oninput="updateReport()">
+        </div>
+        <div class="field">
+            <label>Angolo α (°)</label>
+            <input type="number" id="alpha" value="145" oninput="updateReport()">
+        </div>
+        <div class="field">
+            <label>Quota h₁ Misurata (m)</label>
+            <input type="number" id="h1" value="0.280" oninput="updateReport()">
+        </div>
+    </div>
+
+    <!-- CONTROLLI INQUADRATURA (ZOOM E SPOSTAMENTO) -->
+    <div class="camera-panel">
+        <div class="field">
+            <label>Zoom Disegni</label>
+            <input type="range" id="zoom" min="0.3" max="1.3" step="0.01" value="0.75" oninput="updateReport()">
+        </div>
+        <div class="field">
+            <label>Sposta X</label>
+            <input type="range" id="offX" min="-300" max="300" value="0" oninput="updateReport()">
+        </div>
+        <div class="field">
+            <label>Sposta Y</label>
+            <input type="range" id="offY" min="-300" max="300" value="-60" oninput="updateReport()">
+        </div>
+    </div>
+
+    <!-- FASE 1 -->
+    <div class="phase-block">
+        <div class="phase-title">1. Fase di Caricamento (Rilascio)</div>
+        <canvas id="canvas1" width="850" height="320"></canvas>
+        <textarea id="note1" placeholder="Annotazioni sul posizionamento e l'energia potenziale iniziale..."></textarea>
+    </div>
+
+    <!-- FASE 2 -->
+    <div class="phase-block">
+        <div class="phase-title">2. Fase di Impatto</div>
+        <canvas id="canvas2" width="850" height="320"></canvas>
+        <textarea id="note2" placeholder="Osservazioni sull'urto col provino e la sezione d'urto..."></textarea>
+    </div>
+
+    <!-- FASE 3 -->
+    <div class="phase-block">
+        <div class="phase-title">3. Fase di Risalita (Configurazione Finale)</div>
+        <canvas id="canvas3" width="850" height="320"></canvas>
+        <div class="results-summary" id="results">
+            <!-- Calcoli automatici -->
+        </div>
+    </div>
+
+    <div class="btn-box">
+        <button class="btn-send" onclick="sendData()">Invia Dati al Database</button>
+        <button class="btn-print" onclick="window.print()">Scarica Report PDF</button>
+    </div>
+</div>
+
+<script>
+    // --- INCOLLA QUI L'URL COPIATO DA APPS SCRIPT ---
+    const SCRIPT_URL = "INSERISCI_QUI_IL_TUO_URL_APPS_SCRIPT";
+
+    function updateReport() {
+        const m = parseFloat(document.getElementById('mass').value);
+        const L = parseFloat(document.getElementById('length').value);
+        const alpha = parseFloat(document.getElementById('alpha').value);
+        const h1 = parseFloat(document.getElementById('h1').value);
+        const g = 9.81;
+
+        // Calcoli Fisici
+        const h0 = L * (1 - Math.cos(alpha * Math.PI / 180));
+        const E0 = m * g * h0;
+        const E1 = m * g * h1;
+        const KV = Math.max(0, E0 - E1);
+        const beta = Math.acos(Math.min(Math.max(1 - (h1 / L), -1), 1)) * 180 / Math.PI;
+
+        document.getElementById('results').innerHTML = `
+            RISULTATI CALCOLATI:<br>
+            Energia Potenziale E₀: ${E0.toFixed(2)} J | Energia Residua E₁: ${E1.toFixed(2)} J<br>
+            <span class="red">ENERGIA ASSORBITA (KV): ${KV.toFixed(2)} J</span><br>
+            Quota h₀: ${h0.toFixed(3)} m | Angolo di Risalita β: ${beta.toFixed(2)}°
+        `;
+
+        // Disegno delle 3 fasi con camera control
+        const cam = {
+            zoom: parseFloat(document.getElementById('zoom').value),
+            x: parseFloat(document.getElementById('offX').value),
+            y: parseFloat(document.getElementById('offY').value)
+        };
+
+        drawPhase('canvas1', alpha, h0, "h₀", "#000", cam);
+        drawPhase('canvas2', 0, 0, "", "#666", cam);
+        drawPhase('canvas3', -beta, h1, "h₁", "#000", cam);
+    }
+
+    function drawPhase(id, angle, hVal, hLabel, color, cam) {
+        const canvas = document.getElementById(id);
+        const ctx = canvas.getContext('2d');
+        const L = parseFloat(document.getElementById('length').value);
+        const scale = 400 * cam.zoom; // Scala dinamica basata su zoom
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const px = (canvas.width / 2) + cam.x;
+        const py = 150 + cam.y;
+        
+        const rad = angle * Math.PI / 180;
+        const x = px + Math.sin(rad) * (L * scale);
+        const y = py + Math.cos(rad) * (L * scale);
+
+        // Disegno Pendolo (Nero Massiccio)
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 5 * cam.zoom;
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, 22 * cam.zoom, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Disegno Quota (Rossa)
+        if (hLabel !== "") {
+            const groundY = py + (L * scale);
+            ctx.strokeStyle = "red";
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            // Linea orizzontale dal baricentro
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(px + (angle >= 0 ? 100 : -100), y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Freccia verticale quota
+            const arrowX = px + (angle >= 0 ? 90 : -90);
+            ctx.beginPath();
+            ctx.moveTo(arrowX, groundY);
+            ctx.lineTo(arrowX, y);
+            ctx.stroke();
+            
+            ctx.fillStyle = "red";
+            ctx.font = `bold ${12 * cam.zoom}px Arial`;
+            ctx.fillText(`${hLabel}=${hVal.toFixed(3)}m`, arrowX + 5, y + (groundY - y)/2);
+        }
+
+        // Pivot
+        ctx.fillStyle = "#000";
+        ctx.beginPath();
+        ctx.arc(px, py, 5 * cam.zoom, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    async function sendData() {
+        const kvVal = document.getElementById('results').innerText.split("ASSORBITA (KV): ")[1].split(" J")[0];
+        const data = {
+            nome: document.getElementById('nome').value,
+            cognome: document.getElementById('cognome').value,
+            massa: document.getElementById('mass').value,
+            lunghezza: document.getElementById('length').value,
+            alpha: document.getElementById('alpha').value,
+            h1: document.getElementById('h1').value,
+            kv: kvVal,
+            note1: document.getElementById('note1').value,
+            note2: document.getElementById('note2').value
+        };
+
+        if(!data.nome || !data.cognome) {
+            alert("Inserisci Nome e Cognome prima di inviare!");
+            return;
+        }
+
+        try {
+            await fetch(SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: JSON.stringify(data)
+            });
+            alert("Dati salvati con successo nel database del docente!");
+        } catch (e) {
+            alert("Errore nell'invio. Verifica la connessione.");
+        }
+    }
+
+    // Carica i disegni all'avvio
+    window.onload = updateReport;
+</script>
+
+</body>
+</html>
